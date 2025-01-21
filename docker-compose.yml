@@ -1,0 +1,97 @@
+services:
+  backend:
+    build: .
+    container_name: i9-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MINIO_HOST=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MYSQL_HOST=mysql
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=hritamdey@61
+      - MYSQL_DATABASE=i9_documents
+      - MYSQL_PORT=3306
+    volumes:
+      - ./main.py:/app/main.py
+    networks:
+      - app-network
+    depends_on:
+      - mysql
+      - minio
+
+  minio:
+    image: quay.io/minio/minio:latest  # Using official image from quay.io
+    container_name: i9-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+
+  mysql:
+    image: mysql:8.0
+    container_name: i9-mysql
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=hritamdey@61
+      - MYSQL_DATABASE=i9_documents
+      - MYSQL_ROOT_HOST=%
+      - MYSQL_USER=i9user             # Added a dedicated user
+      - MYSQL_PASSWORD=i9password     # Password for the dedicated user
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-phritamdey@61"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+
+  frontend:
+    image: nginx:alpine
+    container_name: i9-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - app-network
+    depends_on:
+      - backend
+
+volumes:
+  minio_data:
+    name: i9-minio-data
+  mysql_data:
+    name: i9-mysql-data
+
+networks:
+  app-network:
+    name: i9-network
+    driver: bridge

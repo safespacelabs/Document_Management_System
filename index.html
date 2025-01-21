@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>I-9 Document Management System</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      body {
+        background-color: #f5f5f5;
+        padding: 2rem;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      h1 {
+        color: #2c3e50;
+        margin-bottom: 1.5rem;
+        text-align: center;
+      }
+
+      .login-container {
+        max-width: 400px;
+        margin: 100px auto;
+        background-color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        text-align: center;
+      }
+
+      .login-input {
+        width: 100%;
+        padding: 0.75rem;
+        margin: 1rem 0;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        font-size: 1rem;
+      }
+
+      .login-button {
+        background-color: #3498db;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+        width: 100%;
+      }
+
+      .login-button:hover {
+        background-color: #2980b9;
+      }
+
+      .document-section {
+        margin-bottom: 2rem;
+      }
+
+      .section-header {
+        background-color: #34495e;
+        color: white;
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+      }
+
+      .document-item {
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background-color: #f8f9fa;
+      }
+
+      .document-title {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #2c3e50;
+      }
+
+      .upload-container {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 0.5rem;
+      }
+
+      .upload-button {
+        background-color: #3498db;
+        color: white;
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .upload-button:hover {
+        background-color: #2980b9;
+      }
+
+      .file-list {
+        margin-top: 0.5rem;
+      }
+
+      .file-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem;
+        background-color: white;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 0.5rem;
+      }
+
+      .file-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .delete-btn {
+        background-color: #e74c3c;
+        color: white;
+        border: none;
+        padding: 0.25rem 0.75rem;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .delete-btn:hover {
+        background-color: #c0392b;
+      }
+
+      .user-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+      }
+
+      .logout-button {
+        background-color: #e74c3c;
+        color: white;
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .main-container {
+        display: none;
+      }
+
+      .status-message {
+        padding: 1rem;
+        margin: 1rem 0;
+        border-radius: 4px;
+        display: none;
+      }
+
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+
+      .file-size-info {
+        font-size: 0.8rem;
+        color: #666;
+        margin-top: 0.25rem;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="loginScreen" class="login-container">
+      <h1>I-9 Document Management System</h1>
+      <input
+        type="text"
+        id="usernameInput"
+        class="login-input"
+        placeholder="Enter your username"
+        required
+      />
+      <button class="login-button" onclick="handleLogin()">Login</button>
+    </div>
+
+    <div id="mainContainer" class="container main-container">
+      <div class="user-info">
+        <span>Welcome, <strong id="userDisplay"></strong></span>
+        <button class="logout-button" onclick="handleLogout()">Logout</button>
+      </div>
+
+      <h1>I-9 Document Management System</h1>
+
+      <!-- List A Documents -->
+      <div class="document-section">
+        <h2 class="section-header">List A Documents</h2>
+        <div class="document-item">
+          <div class="document-title">U.S. Passport</div>
+          <div class="upload-container">
+            <input
+              type="file"
+              id="passportInput"
+              hidden
+              accept=".pdf,.jpg,.jpeg,.png"
+            />
+            <button
+              class="upload-button"
+              onclick="document.getElementById('passportInput').click()"
+            >
+              Upload Document
+            </button>
+          </div>
+          <div class="file-size-info">Maximum file size: 400KB</div>
+          <div class="file-list" id="passportFiles"></div>
+        </div>
+
+        <div class="document-item">
+          <div class="document-title">Permanent Resident Card</div>
+          <div class="upload-container">
+            <input
+              type="file"
+              id="residentcardInput"
+              hidden
+              accept=".pdf,.jpg,.jpeg,.png"
+            />
+            <button
+              class="upload-button"
+              onclick="document.getElementById('residentcardInput').click()"
+            >
+              Upload Document
+            </button>
+          </div>
+          <div class="file-size-info">Maximum file size: 400KB</div>
+          <div class="file-list" id="residentcardFiles"></div>
+        </div>
+      </div>
+
+      <!-- List B Documents -->
+      <div class="document-section">
+        <h2 class="section-header">List B Documents</h2>
+        <div class="document-item">
+          <div class="document-title">Driver's License</div>
+          <div class="upload-container">
+            <input
+              type="file"
+              id="driverslicenseInput"
+              hidden
+              accept=".pdf,.jpg,.jpeg,.png"
+            />
+            <button
+              class="upload-button"
+              onclick="document.getElementById('driverslicenseInput').click()"
+            >
+              Upload Document
+            </button>
+          </div>
+          <div class="file-size-info">Maximum file size: 400KB</div>
+          <div class="file-list" id="driverslicenseFiles"></div>
+        </div>
+
+        <div class="document-item">
+          <div class="document-title">School ID Card</div>
+          <div class="upload-container">
+            <input
+              type="file"
+              id="schoolidInput"
+              hidden
+              accept=".pdf,.jpg,.jpeg,.png"
+            />
+            <button
+              class="upload-button"
+              onclick="document.getElementById('schoolidInput').click()"
+            >
+              Upload Document
+            </button>
+          </div>
+          <div class="file-size-info">Maximum file size: 400KB</div>
+          <div class="file-list" id="schoolidFiles"></div>
+        </div>
+      </div>
+
+      <!-- List C Documents -->
+      <div class="document-section">
+        <h2 class="section-header">List C Documents</h2>
+        <div class="document-item">
+          <div class="document-title">Social Security Card</div>
+          <div class="upload-container">
+            <input
+              type="file"
+              id="ssncardInput"
+              hidden
+              accept=".pdf,.jpg,.jpeg,.png"
+            />
+            <button
+              class="upload-button"
+              onclick="document.getElementById('ssncardInput').click()"
+            >
+              Upload Document
+            </button>
+          </div>
+          <div class="file-size-info">Maximum file size: 400KB</div>
+          <div class="file-list" id="ssncardFiles"></div>
+        </div>
+
+        <div class="document-item">
+          <div class="document-title">Birth Certificate</div>
+          <div class="upload-container">
+            <input
+              type="file"
+              id="birthcertInput"
+              hidden
+              accept=".pdf,.jpg,.jpeg,.png"
+            />
+            <button
+              class="upload-button"
+              onclick="document.getElementById('birthcertInput').click()"
+            >
+              Upload Document
+            </button>
+          </div>
+          <div class="file-size-info">Maximum file size: 400KB</div>
+          <div class="file-list" id="birthcertFiles"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE_URL = "/api";
+      const MAX_FILE_SIZE = 400 * 1024; // 400KB in bytes
+      let currentUsername = "";
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const savedUsername = localStorage.getItem("i9_username");
+        if (savedUsername) {
+          loginUser(savedUsername);
+        }
+        setupFileInputs();
+      });
+
+      function handleLogin() {
+        const username = document.getElementById("usernameInput").value.trim();
+        if (username) {
+          loginUser(username);
+        } else {
+          showMessage("Please enter a username", false);
+        }
+      }
+
+      function loginUser(username) {
+        currentUsername = username;
+        localStorage.setItem("i9_username", username);
+
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("mainContainer").style.display = "block";
+        document.getElementById("userDisplay").textContent = username;
+
+        loadExistingDocuments();
+      }
+
+      function handleLogout() {
+        localStorage.removeItem("i9_username");
+        currentUsername = "";
+
+        document.getElementById("loginScreen").style.display = "block";
+        document.getElementById("mainContainer").style.display = "none";
+        document.getElementById("usernameInput").value = "";
+
+        // Clear all file lists
+        document
+          .querySelectorAll(".file-list")
+          .forEach((list) => (list.innerHTML = ""));
+      }
+
+      function setupFileInputs() {
+        document.querySelectorAll('input[type="file"]').forEach((input) => {
+          input.addEventListener("change", async (e) => {
+            if (e.target.files.length > 0) {
+              const file = e.target.files[0];
+              const documentType = input.id.replace("Input", "");
+
+              // Check file size before upload
+              if (file.size > MAX_FILE_SIZE) {
+                showMessage(
+                  `File size must be less than 400KB. Current size: ${(
+                    file.size / 1024
+                  ).toFixed(1)}KB`,
+                  false
+                );
+                e.target.value = ""; // Reset input
+                return;
+              }
+
+              await uploadFile(file, documentType);
+              // Reset the input after upload
+              e.target.value = "";
+            }
+          });
+        });
+      }
+
+      async function loadExistingDocuments() {
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/view/${currentUsername}`
+          );
+          if (!response.ok) throw new Error("Failed to load documents");
+
+          const data = await response.json();
+          displayExistingDocuments(data.documents);
+        } catch (error) {
+          showMessage(error.message, false);
+        }
+      }
+
+     async function uploadFile(file, documentType) {
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+
+          const uploadUrl = `${API_BASE_URL}/upload/${currentUsername}/${documentType}`;
+          console.log('Attempting upload to:', uploadUrl);
+
+          const response = await fetch(uploadUrl, {
+            method: "POST",
+            body: formData
+          });
+
+          console.log('Response status:', response.status);
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || "Upload failed");
+          }
+
+          const data = await response.json();
+          showMessage("Document uploaded successfully!", true);
+          await loadExistingDocuments();
+        } catch (error) {
+          console.error("Upload error:", error);
+          showMessage(`Upload failed: ${error.message}`, false);
+        }
+      }
+
+      async function deleteFile(documentType) {
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/delete/${currentUsername}/${documentType}`,
+            {
+              method: "DELETE",
+            }
+          );
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || "Deletion failed");
+          }
+
+          showMessage("Document deleted successfully!", true);
+          await loadExistingDocuments();
+        } catch (error) {
+          showMessage(error.message, false);
+        }
+      }
+
+      function displayExistingDocuments(documents) {
+        // Clear all file lists first
+        document
+          .querySelectorAll(".file-list")
+          .forEach((list) => (list.innerHTML = ""));
+
+        // Display documents for each list
+        Object.entries(documents).forEach(([listType, files]) => {
+          files.forEach((file) => {
+            const docType = file.document_type; // Changed from filename.split('.')[0]
+            const fileListId = `${docType}Files`;
+            const fileList = document.getElementById(fileListId);
+
+            if (fileList) {
+              const fileItem = createFileItemElement(file.filename, docType);
+              fileList.appendChild(fileItem);
+            }
+          });
+        });
+      }
+
+      function createFileItemElement(filename, documentType) {
+        const fileItem = document.createElement("div");
+        fileItem.className = "file-item";
+        fileItem.innerHTML = `
+        <div class="file-info">
+            <span>📄 ${filename}</span>
+        </div>
+        <button class="delete-btn" onclick="deleteFile('${documentType}')">Delete</button>
+    `;
+        return fileItem;
+      }
+
+      function showMessage(message, isSuccess) {
+        // Remove any existing message
+        const existingMessage = document.querySelector(".status-message");
+        if (existingMessage) {
+          existingMessage.remove();
+        }
+
+        // Create new message element
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `status-message ${
+          isSuccess ? "success" : "error"
+        }`;
+        messageDiv.textContent = message;
+        messageDiv.style.display = "block";
+
+        // Insert message at the top of the container
+        const container = document.querySelector(".container");
+        container.insertBefore(messageDiv, container.firstChild);
+
+        // Remove message after 3 seconds
+        setTimeout(() => {
+          messageDiv.remove();
+        }, 3000);
+      }
+    </script>
+  </body>
+</html>
