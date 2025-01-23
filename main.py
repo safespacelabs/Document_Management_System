@@ -13,6 +13,11 @@ from datetime import datetime, timedelta
 from typing import Dict, List
 import json
 import time
+from typing import List, Optional
+from datetime import datetime
+from pydantic import BaseModel
+from fastapi.responses import StreamingResponse
+
 
 app = FastAPI(title="I-9 Document Management System")
 
@@ -71,6 +76,26 @@ DOCUMENT_LISTS = {
 }
 
 ALLOWED_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png'}
+
+
+class FileMetadata(BaseModel):
+    file_id: str
+    username: str
+    filename: str
+    document_type: str
+    document_list: str
+    content_type: str
+    file_size: int
+    created_at: datetime
+    updated_at: datetime
+    tags: Optional[dict] = None
+
+class MySQLStats(BaseModel):
+    total_files: int
+    files_per_user: dict
+    files_per_type: dict
+    total_storage: float  # in MB
+    average_file_size: float  # in KB
 
 def init_minio():
     try:
@@ -456,6 +481,217 @@ async def get_download_url(username: str, list_type: str, filename: str):
 @app.get("/")
 async def root():
     return {"message": "I-9 Document Management System API is running"}
+
+@app.get("/mysql/stats", response_model=MySQLStats)
+async def get_mysql_stats():
+    """
+    Get statistics about the stored file metadata from MySQL.
+    Returns aggregated data about file counts, sizes, and distribution.
+    """
+    try:
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        
+        # Get total number of files
+        cursor.execute("SELECT COUNT(*) as total FROM file_metadata")
+        total_files = cursor.fetchone()['total']
+        
+        # Get files per user
+        cursor.execute("""
+            SELECT username, COUNT(*) as file_count 
+            FROM file_metadata 
+            GROUP BY username
+        """)
+        files_per_user = {row['username']: row['file_count'] 
+                         for row in cursor.fetchall()}
+        
+        # Get files per document type
+        cursor.execute("""
+            SELECT document_type, COUNT(*) as type_count 
+            FROM file_metadata 
+            GROUP BY document_type
+        """)
+        files_per_type = {row['document_type']: row['type_count'] 
+                         for row in cursor.fetchall()}
+        
+        # Get storage statistics
+        cursor.execute("""
+            SELECT 
+                SUM(file_size) as total_size,
+                AVG(file_size) as avg_size
+            FROM file_metadata
+        """)
+        size_stats = cursor.fetchone()
+        
+        cursor.close()
+        conn.close()
+        
+        return MySQLStats(
+            total_files=total_files,
+            files_per_user=files_per_user,
+            files_per_type=files_per_type,
+            total_storage=round(size_stats['total_size'] / (1024 * 1024), 2),  # MB
+            average_file_size=round(size_stats['avg_size'] / 1024, 2)  # KB
+        )
+        
+    except Error as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Database error: {str(e)}"
+        )
+
+@app.get("/minio/stats")
+async def get_minio_stats():
+    """
+    Get statistics about the stored files in MinIO.
+    Returns information about bucket usage and object distribution.
+    """
+    try:
+        # Get bucket statistics
+        objects = list(minio_client.list_objects(BUCKET_NAME, recursive=True))
+        
+        # Calculate statistics
+        total_objects = len(objects)
+        total_size = sum(obj.size for obj in objects)
+        
+        # Group objects by prefix (username)
+        user_stats = {}
+        for obj in objects:
+            username = obj.object_name.split('/')[0]
+            if username not in user_stats:
+                user_stats[username] = {
+                    'file_count': 0,
+                    'total_size': 0
+                }
+            user_stats[username]['file_count'] += 1
+            user_stats[username]['total_size'] += obj.size
+        
+        return {
+            "bucket_name": BUCKET_NAME,
+            "total_objects": total_objects,
+            "total_size_mb": round(total_size / (1024 * 1024), 2),
+            "user_statistics": user_stats
+        }
+        
+    except S3Error as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"MinIO error: {str(e)}"
+        )
+@app.get("/files/metadata", response_model=List[FileMetadata])
+async def get_all_files_metadata(
+    username: Optional[str] = None,
+    document_type: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0
+):
+    """
+    Get metadata for all files with optional filtering.
+    """
+    try:
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        
+        # Start with base query
+        query = "SELECT * FROM file_metadata WHERE 1=1"
+        params = []
+        
+        # Add username filter if provided
+        if username:
+            query += " AND username = %s"
+            params.append(username)
+            
+        # Add document type filter if provided
+        if document_type:
+            query += " AND document_type = %s"
+            params.append(document_type)
+            
+        # Add limit and offset
+        query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
+        params.extend([limit, offset])
+        
+        # Print query and parameters for debugging
+        print(f"Executing query: {query}")
+        print(f"With parameters: {params}")
+        
+        cursor.execute(query, params)
+        results = cursor.fetchall()
+        
+        # Convert datetime objects to strings to avoid JSON serialization issues
+        for result in results:
+            if 'created_at' in result:
+                result['created_at'] = result['created_at'].isoformat()
+            if 'updated_at' in result:
+                result['updated_at'] = result['updated_at'].isoformat()
+            # Convert tags from string to dict if it exists
+            if 'tags' in result and isinstance(result['tags'], str):
+                result['tags'] = json.loads(result['tags'])
+        
+        cursor.close()
+        conn.close()
+        
+        return results
+        
+    except Exception as e:
+        print(f"Error in get_all_files_metadata: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
+
+@app.get("/files/download/batch/{username}")
+async def batch_download_files(username: str):
+    """
+    Generate pre-signed URLs for all files belonging to a user.
+    """
+    try:
+        # Get all files for the user from MySQL
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        
+        cursor.execute(
+            "SELECT * FROM file_metadata WHERE username = %s",
+            (username,)
+        )
+        files = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
+        # Generate pre-signed URLs for each file
+        download_urls = {}
+        for file in files:
+            object_path = get_object_path(
+                username,
+                file['document_list'],
+                file['filename']
+            )
+            
+            try:
+                url = minio_client.get_presigned_url(
+                    "GET",
+                    BUCKET_NAME,
+                    object_path,
+                    expires=timedelta(hours=1)
+                )
+                download_urls[file['filename']] = {
+                    'url': url,
+                    'document_type': file['document_type'],
+                    'document_list': file['document_list'],
+                    'content_type': file['content_type'],
+                    'file_size': file['file_size']
+                }
+            except S3Error as e:
+                print(f"Error generating URL for {object_path}: {str(e)}")
+                continue
+        
+        return {"download_urls": download_urls}
+        
+    except Error as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
 
 if __name__ == "__main__":
     import uvicorn
